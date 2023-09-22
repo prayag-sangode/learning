@@ -1,0 +1,229 @@
+# Install ansible
+
+sudo apt-get update
+sudo apt-get install ansible
+
+# Update ansible
+
+sudo apt install software-properties-common
+sudo add-apt-repository --yes --update ppa:ansible/ansible
+sudo apt install ansible
+
+# Create an inventory file
+
+mkdir playbooks
+cd playbook
+cat > hosts.ini
+[servers]
+192.168.1.14 # Replace with your managed node ip
+
+# Ad hoc commands
+
+1. Ping Module - uses the 'ping' module to check the reachability of all hosts in your inventory
+   
+   ansible all -m ping -i hosts.ini
+
+2. Command Module - uses the 'command' module to execute the `ls` command on hosts in the "server" group, listing the contents of the `/tmp directory.
+  
+ansible servers -m command -a "ls /tmp" -i hosts.ini
+
+
+3. Package Installation with yum Module: uses the 'yum' module to install  the `httpd` package, ensuring it is present on hosts in the "servers" group.
+  
+ansible servers -m apt -a "name=apache2 state=present" -i hosts.ini --become
+
+on managed node check if package is installed -
+
+dpkg -l | grep apache2
+
+
+# Playbooks
+
+# Install mysql-client
+
+Check on managed node is mysql-client is not installed
+
+dpkg -l | grep mysql
+
+On control node run playbook
+
+cat mysql-client.yaml
+---
+- name: Install mysql-client
+  hosts: servers
+  gather_facts: true
+  become: True
+  become_user: root
+  tasks:
+
+    - name: Install mysql-client
+      ansible.builtin.apt:
+        name: mysql-client
+        state: present
+
+ansible-playbook -i hosts.ini mysql-client.yaml
+
+Check on managed node if mysql-client is installed
+
+dpkg -l | grep mysql
+
+# Variable example to install multiple packages
+Check on managed node if packages are already installed 
+
+ dpkg -l | grep docker
+ dpkg -l | grep nmap
+
+On Control node 
+
+ansible-playbook -i hosts.ini packages.yaml
+
+cat packages.yaml
+---
+- name: Install multiple packages
+  hosts: servers
+  gather_facts: true
+  become: True
+  become_user: root
+
+  vars:
+    packages_to_install:
+      - nmap
+      - docker.io
+
+  tasks:
+    - name: Update package cache
+      apt:
+        update_cache: yes
+      when: ansible_os_family == 'Debian'
+
+    - name: Install packages
+      package:
+        name: "{{ packages_to_install }}"
+        state: present
+
+
+Check on managed node if packages are already installed 
+ dpkg -l | grep docker
+ dpkg -l | grep nmap
+
+# var debug register example
+
+---
+- name: Install multiple packages and check result
+  hosts: servers
+  gather_facts: true
+  become: True
+  become_user: root
+
+  tasks:
+    - name: Get Disk Space
+      command: df -h /
+      register: disk_space_result
+
+    - name: Display Disk Space
+      debug:
+        var: disk_space_result.stdout_lines
+
+
+  
+ansible-playbook -i hosts.ini disk-result.yaml
+
+
+cat disk-result.yaml
+---
+- name: Get and display disk space
+  hosts: servers
+  gather_facts: true
+  become: True
+  become_user: root
+
+  tasks:
+    - name: Get Disk Space
+      command: df -h /
+      register: disk_space_result
+
+    - name: Display Disk Space
+      debug:
+        var: disk_space_result.stdout_lines
+
+
+# fact example
+
+cat get_facts.yaml
+---
+- name: Show Specific Ansible Fact
+  hosts: servers
+  gather_facts: true
+  become: True
+  become_user: root
+
+  tasks:
+    - name: Display Operating System
+      debug:
+        var: ansible_facts['distribution']
+
+ansible-playbook -i hosts.ini get_facts.yaml
+
+
+# handler and notify
+
+---
+- name: notify handler
+  hosts: servers
+  gather_facts: true
+  become: True
+  become_user: root
+
+  tasks:
+    - name: Create a file
+      command: touch /tmp/myfile.txt
+      notify: 
+        - restart service
+
+  handlers:
+    - name: restart service
+      command: systemctl restart apache2
+
+
+cat user-sudo.yaml
+---
+- name: Add User and Grant Sudo Privileges
+  hosts: servers
+  gather_facts: true
+  become: True
+  become_user: root
+
+  tasks:
+    - name: Prompt user for username
+      pause:
+        prompt: "Enter the username you want to add: "
+      register: user_input
+
+    - set_fact:
+        new_username: "{{ user_input.user_input }}"
+
+    - name: Create user
+      user:
+        name: "{{ new_username }}"
+        state: present
+
+    - name: Add user to sudoers
+      lineinfile:
+        path: /etc/sudoers
+        line: "{{ new_username }} ALL=(ALL:ALL) ALL"
+        validate: 'visudo -cf %s'
+
+ansible-playbook -i hosts.ini user-sudo.yaml
+
+Check on managed node
+
+ cat /etc/passwd | grep devops12
+ cat /etc/sudoers | grep devops12
+
+
+
+
+
+
+
+
