@@ -1,3 +1,7 @@
+# Check if ansible is already installed
+
+dpkg -l | grep ansible
+
 # Install ansible
 
 sudo apt-get update
