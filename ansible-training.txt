@@ -38,7 +38,7 @@ ansible servers -m apt -a "name=apache2 state=present" -i hosts.ini --become
 
 on managed node check if package is installed -
 
-dpkg -l | grep mysql-client
+dpkg -l | grep apache
 
 
 # Playbooks
