@@ -79,8 +79,6 @@ Check on managed node if packages are already installed
 
 On Control node 
 
-ansible-playbook -i hosts.ini packages.yaml
-
 cat packages.yaml
 ---
 - name: Install multiple packages
@@ -105,6 +103,7 @@ cat packages.yaml
         name: "{{ packages_to_install }}"
         state: present
 
+ansible-playbook -i hosts.ini packages.yaml
 
 Check on managed node if packages are already installed 
  dpkg -l | grep docker
@@ -170,6 +169,7 @@ ansible-playbook -i hosts.ini get_facts.yaml
     - name: restart service
       command: systemctl restart apache2
 
+# Create a suser and add it in sudoers
 
 cat user-sudo.yaml
 ---
