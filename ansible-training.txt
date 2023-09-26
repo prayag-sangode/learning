@@ -113,7 +113,7 @@ Check on managed node if packages are already installed
 # var debug register example
 
 ---
-- name: Install multiple packages and check result
+- name: Get disk space
   hosts: servers
   gather_facts: true
   become: True
@@ -131,24 +131,6 @@ Check on managed node if packages are already installed
 
   
 ansible-playbook -i hosts.ini disk-result.yaml
-
-
-cat disk-result.yaml
----
-- name: Get and display disk space
-  hosts: servers
-  gather_facts: true
-  become: True
-  become_user: root
-
-  tasks:
-    - name: Get Disk Space
-      command: df -h /
-      register: disk_space_result
-
-    - name: Display Disk Space
-      debug:
-        var: disk_space_result.stdout_lines
 
 
 # fact example
