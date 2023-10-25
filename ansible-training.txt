@@ -207,6 +207,38 @@ Check on managed node
  cat /etc/sudoers | grep devops12
 
 
+Create a user with encrypted password 
+
+sudo apt install makepasswd -y
+
+echo -n redhat | makepasswd --crypt-md5 --clearfrom -
+redhat   $1$E2CWtk2w$TNiEpCE8sBRal9JT6HaeU0
+
+
+cat user_pass.yaml
+---
+- name: Add User and Grant Sudo Privileges
+  hosts: servers
+  gather_facts: true
+  become: True
+  become_user: root
+
+  vars:
+    username: redhat
+    encrypted_password: '$1$E2CWtk2w$TNiEpCE8sBRal9JT6HaeU0'  # Replace with the generated encrypted password
+
+  tasks:
+    - name: Add user
+      user:
+        name: "{{ username }}"
+        password: "{{ encrypted_password }}"
+        state: present
+        shell: /bin/bash
+        createhome: yes
+
+ansible-playbook user_pass.yaml -i hosts.ini
+
+ssh redhat@192.168.1.14
 
 
 
