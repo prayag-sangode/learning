@@ -207,7 +207,7 @@ Check on managed node
  cat /etc/sudoers | grep devops12
 
 
-Create a user with encrypted password 
+# Create a user with encrypted password 
 
 sudo apt install makepasswd -y
 
