@@ -111,6 +111,7 @@ Check on managed node if packages are already installed
 
 # var debug register example
 
+cat > debug.yaml
 ---
 - name: Get disk space
   hosts: servers
