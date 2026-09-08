@@ -287,12 +287,60 @@ docker system prune -a
 
 ---
 
-## Learning Outcomes
-- Practice **ad‑hoc commands** before building files.  
-- Build and run Docker images.  
-- Use ENV overrides and secrets.  
-- Work with bind mounts and named volumes.  
-- Debug with logs, exec, inspect, stats.  
-- Stop, remove, prune containers/images/volumes.  
-- Push/pull images to Docker Hub and test with curl.  
+## Step 17: Working with Multiple Containers 
+
+### 1. Create a user‑defined network
+```
+docker network create hello-net
+```
+
+### 2. Run a backend container (Hello Backend)
+We’ll use the lightweight `hashicorp/http-echo` image to serve a hello message:
+```
+docker run -d --name hello-backend \
+  --network hello-net \
+  -p 9000:5678 \
+  hashicorp/http-echo:0.2.3 \
+  -text="Hello from Backend"
+```
+
+### 3. Run a frontend container (Hello Frontend)
+Another `http-echo` container, acting as frontend:
+```
+docker run -d --name hello-frontend \
+  --network hello-net \
+  -p 9001:5678 \
+  hashicorp/http-echo:0.2.3 \
+  -text="Hello from Frontend"
+```
+
+### 4. Test connectivity
+From your host:
+```bash
+curl http://localhost:9000   # Hello from Backend
+curl http://localhost:9001   # Hello from Frontend
+```
+
+From inside the frontend container, test backend:
+```
+docker exec -it hello-frontend curl http://hello-backend:5678
+```
+You’ll see `"Hello from Backend"` proving containers can talk to each other by **service name** over the Docker network.
+
+---
+
+## Step 18: Inspect Networks
+```bash
+docker network ls
+docker network inspect hello-net
+```
+
+---
+
+## Step 19: Stop & Remove Multiple Containers
+```bash
+docker stop hello-frontend hello-backend
+docker rm hello-frontend hello-backend
+docker network rm hello-net
+```
 
