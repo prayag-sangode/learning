@@ -1,3 +1,184 @@
+#  Lab: Secure Web App on EKS with ALB + WAF
+
+## Step 1: Create EKS Cluster
+```bash
+eksctl create cluster --name demo-cluster --region us-east-1 --nodes 3
+aws eks update-kubeconfig --region us-east-1 --name demo-cluster
+kubectl get nodes
+```
+
+---
+
+## Step 2: Sample HTML App
+**Dockerfile**
+```bash
+cat >> Dockerfile <<'EOF'
+FROM nginx:alpine
+COPY index.html /usr/share/nginx/html/index.html
+EXPOSE 80
+EOF
+```
+
+**index.html**
+```bash
+cat >> index.html <<'EOF'
+<!DOCTYPE html>
+<html>
+<head>
+  <title>EKS ALB + WAF Demo</title>
+</head>
+<body>
+  <h1>Hello from EKS!</h1>
+  <p>This app is protected by AWS WAF.</p>
+</body>
+</html>
+EOF
+```
+
+Build & push:
+```bash
+docker build -t <dockerhub_user>/eks-html-app:latest .
+docker push <dockerhub_user>/eks-html-app:latest
+```
+
+---
+
+## Step 3: Deployment
+```bash
+cat >> deployment.yaml <<'EOF'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: html-deploy
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: html-app
+  template:
+    metadata:
+      labels:
+        app: html-app
+    spec:
+      containers:
+        - name: html-container
+          image: <dockerhub_user>/eks-html-app:latest
+          ports:
+            - containerPort: 80
+EOF
+kubectl apply -f deployment.yaml
+```
+
+---
+
+## Step 4: Service (ClusterIP)
+```bash
+cat >> service.yaml <<'EOF'
+apiVersion: v1
+kind: Service
+metadata:
+  name: html-service
+spec:
+  type: ClusterIP
+  selector:
+    app: html-app
+  ports:
+    - port: 80
+      targetPort: 80
+EOF
+kubectl apply -f service.yaml
+```
+
+---
+
+## Step 5: Install AWS Load Balancer Controller
+```bash
+helm repo add eks https://aws.github.io/eks-charts
+helm repo update
+helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
+  -n kube-system \
+  --set clusterName=demo-cluster \
+  --set region=us-east-1
+```
+
+---
+
+## Step 6: Request ACM Certificate
+```bash
+aws acm request-certificate \
+  --domain-name app.example.com \
+  --validation-method DNS \
+  --region us-east-1
+```
+- Validate via Route53.
+
+---
+
+## Step 7: Create WAF WebACL
+```bash
+aws wafv2 create-web-acl \
+  --name eks-web-acl \
+  --scope REGIONAL \
+  --default-action Allow={} \
+  --rules '[]' \
+  --visibility-config SampledRequestsEnabled=true,CloudWatchMetricsEnabled=true,MetricName=eksWebACL \
+  --region us-east-1
+```
+- Note the WebACL ARN.
+
+---
+
+## Step 8: Ingress with ACM + WAF
+```bash
+cat >> ingress.yaml <<'EOF'
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: html-ingress
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:123456789012:certificate/abcd-efgh
+    alb.ingress.kubernetes.io/waf-acl-arn: arn:aws:wafv2:us-east-1:123456789012:regional/webacl/eks-web-acl/abcd1234
+spec:
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: html-service
+                port:
+                  number: 80
+EOF
+kubectl apply -f ingress.yaml
+```
+
+---
+
+## Step 9: Test
+```bash
+kubectl get ingress html-ingress
+curl https://app.example.com
+```
+
+- You should see the HTML page served from EKS.  
+- WAF filters malicious requests (SQL injection, XSS, rate limiting if rules are added).
+
+---
+
+# End Result
+- **ALB Ingress Controller** provisions ALB.  
+- **ACM** provides TLS termination.  
+- **AWS WAF WebACL** protects the app.  
+- **Sample HTML app** deployed on EKS, accessible via HTTPS.  
+- Architecture is **simple, secure, cost‑effective** — ideal for web apps and microservices.
+
+
+
+
 # Full Stack App on EKS with AWS WAF
 
 ## Step 1: Create EKS Cluster
