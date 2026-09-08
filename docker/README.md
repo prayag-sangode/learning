@@ -119,66 +119,27 @@ docker build -t html-app .
 ---
 
 ## Step 3: Run Containers
-
-### Run with defaults
 ```bash
 docker run -d -p 8081:80 html-app
-```
-
-### Run with ENV overrides
-```bash
-docker run -d -p 8082:80 \
-  -e APP_ENV=development \
-  -e API_URL=https://dev-api.example.com \
-  html-app
-```
-
-### Run with secret file mounted
-```bash
-docker run -d -p 8083:80 \
-  -v $(pwd)/db_secret.env:/run/secrets/db_secret.env:ro \
-  html-app
+docker run -d -p 8082:80 -e APP_ENV=development -e API_URL=https://dev-api.example.com html-app
+docker run -d -p 8083:80 -v $(pwd)/db_secret.env:/run/secrets/db_secret.env:ro html-app
 ```
 
 ---
 
 ## Step 4: Bind Mounts (Live Editing)
 ```bash
-docker run -d -p 8084:80 \
-  -v $(pwd)/index.html:/var/www/html/index.html:ro \
-  html-app
+docker run -d -p 8084:80 -v $(pwd)/index.html:/var/www/html/index.html:ro html-app
 ```
-- Edit `index.html` locally → refresh browser → changes appear instantly.  
-- Demonstrates **bind mounts**.
 
 ---
 
 ## Step 5: Named Docker Volumes
-
-### Create a named volume
 ```bash
 docker volume create html_data
-```
-
-### List volumes
-```bash
 docker volume ls
-```
-
-### Run container with named volume
-```bash
-docker run -d -p 8085:80 \
-  -v html_data:/var/www/html \
-  html-app
-```
-
-### Inspect volume
-```bash
+docker run -d -p 8085:80 -v html_data:/var/www/html html-app
 docker volume inspect html_data
-```
-
-### Copy files into the volume
-```bash
 docker cp index.html <container_id>:/var/www/html/index.html
 ```
 
@@ -191,6 +152,7 @@ docker logs <container_id>
 docker exec -it <container_id> bash
 docker inspect <container_id>
 docker stats
+docker events
 ```
 
 ---
@@ -209,6 +171,33 @@ docker rmi html-app
 docker volume rm html_data
 docker volume prune
 docker system prune -a
+docker system df
+docker info
+```
+
+---
+
+## Step 9: Ephemeral vs Persistent Demo
+```bash
+docker run -it --name ephemeral-test ubuntu:24.04 bash
+echo "Hello Ephemeral World" > /tmp/test.txt
+exit
+docker start -ai ephemeral-test
+cat /tmp/test.txt   # File exists
+docker rm -f ephemeral-test
+docker run -it ubuntu:24.04 bash
+cat /tmp/test.txt   # File gone
+```
+
+With volume:
+```bash
+docker volume create persist-demo
+docker run -it -v persist-demo:/data ubuntu:24.04 bash
+echo "Persistent data survives!" > /data/keep.txt
+exit
+docker rm -f <container_id>
+docker run -it -v persist-demo:/data ubuntu:24.04 bash
+cat /data/keep.txt   # File survives
 ```
 
 ---
@@ -220,25 +209,18 @@ docker build -t html-app .
 
 ---
 
-## Step 11: Run Locally
+## Step 11: Run Locally & Test
 ```bash
 docker run -d -p 8081:80 html-app
-```
-
-### Test with curl
-```bash
 curl http://localhost:8081
 ```
 
 ---
 
 ## Step 12: Docker Hub Setup
-1. Go to [Docker Hub](https://hub.docker.com) and **create an account**.  
-2. Log in from your VM:
-   ```bash
-   docker login
-   ```
-   Enter your Docker Hub username and password.
+```bash
+docker login
+```
 
 ---
 
@@ -254,10 +236,6 @@ docker push <your_dockerhub_username>/html-app:latest
 ```bash
 docker pull <your_dockerhub_username>/html-app:latest
 docker run -d -p 8082:80 <your_dockerhub_username>/html-app:latest
-```
-
-### Test with curl
-```bash
 curl http://localhost:8082
 ```
 
@@ -287,45 +265,15 @@ docker system prune -a
 
 ---
 
-## Step 17: Working with Multiple Containers 
-
-### 1. Create a user‑defined network
-```
-docker network create hello-net
-```
-
-### 2. Run a backend container (Hello Backend)
-We’ll use the lightweight `hashicorp/http-echo` image to serve a hello message:
-```
-docker run -d --name hello-backend \
-  --network hello-net \
-  -p 9000:5678 \
-  hashicorp/http-echo:0.2.3 \
-  -text="Hello from Backend"
-```
-
-### 3. Run a frontend container (Hello Frontend)
-Another `http-echo` container, acting as frontend:
-```
-docker run -d --name hello-frontend \
-  --network hello-net \
-  -p 9001:5678 \
-  hashicorp/http-echo:0.2.3 \
-  -text="Hello from Frontend"
-```
-
-### 4. Test connectivity
-From your host:
+## Step 17: Working with Multiple Containers (Hello Demo)
 ```bash
-curl http://localhost:9000   # Hello from Backend
-curl http://localhost:9001   # Hello from Frontend
-```
-
-From inside the frontend container, test backend:
-```
+docker network create hello-net
+docker run -d --name hello-backend --network hello-net -p 9000:5678 hashicorp/http-echo:0.2.3 -text="Hello from Backend"
+docker run -d --name hello-frontend --network hello-net -p 9001:5678 hashicorp/http-echo:0.2.3 -text="Hello from Frontend"
+curl http://localhost:9000
+curl http://localhost:9001
 docker exec -it hello-frontend curl http://hello-backend:5678
 ```
-You’ll see `"Hello from Backend"` proving containers can talk to each other by **service name** over the Docker network.
 
 ---
 
@@ -344,3 +292,66 @@ docker rm hello-frontend hello-backend
 docker network rm hello-net
 ```
 
+---
+
+## Step 20: Docker Compose Basics
+Create `docker-compose.yml`:
+```yaml
+version: "3.9"
+services:
+  frontend:
+    image: hashicorp/http-echo:0.2.3
+    command: ["-text=Hello from Frontend"]
+    ports:
+      - "9001:5678"
+  backend:
+    image: hashicorp/http-echo:0.2.3
+    command: ["-text=Hello from Backend"]
+    ports:
+      - "9000:5678"
+```
+
+Run:
+```bash
+docker compose up -d
+curl http://localhost:9000
+curl http://localhost:9001
+docker compose down
+```
+
+---
+
+## Step 21: Resource Limits
+```bash
+docker run -d --name limited-app --memory="256m" --cpus="0.5" html-app
+docker stats limited-app
+```
+
+---
+
+## Step 22: Dockerfile Optimization
+Example multi‑stage build:
+```dockerfile
+FROM ubuntu:24.04 AS builder
+RUN echo "Building app..."
+FROM nginx:alpine
+COPY --from=builder /usr/share/nginx/html /usr/share/nginx/html
+```
+
+---
+
+## Learning Outcomes
+- Ad‑hoc Docker commands.  
+- Build/run images with ENV, secrets, bind mounts, volumes.  
+- Debug with logs, exec, inspect, stats, events.  
+- Stop, remove, prune, system management.  
+- Ephemeral vs persistent demo.  
+- Docker Hub push/pull workflow.  
+- Multi‑container networking.  
+- Docker Compose orchestration.  
+- Resource limits.  
+- Dockerfile optimization.  
+
+---
+
+This README.md is now a **complete Docker fundamentals lab guide** — perfect for Day‑1 learners and a strong foundation for moving into Kubernetes.
