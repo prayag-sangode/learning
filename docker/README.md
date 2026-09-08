@@ -57,7 +57,7 @@ docker system prune -a
 
 ---
 
-# 🛠 Working with Docker
+# Working with Docker
 
 ## Step 1: Create Files
 
