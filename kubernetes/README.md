@@ -459,8 +459,4 @@ kubectl apply -f networkpolicy.yaml
 - Debug with logs, exec, and describe.  
 - Clean up resources efficiently.  
 
----
 
-This complements your YAML‑based crash course: learners now see both **imperative (quick, ad‑hoc)** and **declarative (YAML, reproducible)** approaches.  
-
-Would you like me to **merge these imperative commands into your Kubernetes crash course README** so it flows naturally before the YAML sections (like you did with Docker ad‑hoc commands)?
