@@ -178,6 +178,107 @@ curl https://app.example.com
 
 
 
+---
+
+# WAF Testing Lab (ALB + WAF)
+
+## Step 1: Confirm Setup
+- You already have:
+  - **ALB Ingress Controller** installed.  
+  - **Ingress resource** annotated with your **ACM certificate ARN** and **WAF WebACL ARN**.  
+  - A sample app (HTML or Node.js frontend) exposed via ALB.  
+
+Check:
+```bash
+kubectl get ingress html-ingress
+```
+Note the ALB DNS name.
+
+---
+
+## Step 2: Add WAF Rules
+Update your WebACL with some basic protections:
+
+```bash
+aws wafv2 update-web-acl \
+  --name eks-web-acl \
+  --scope REGIONAL \
+  --id <webacl_id> \
+  --default-action Allow={} \
+  --rules '[
+    {
+      "Name": "SQLiRule",
+      "Priority": 1,
+      "Statement": {
+        "SqliMatchStatement": {
+          "FieldToMatch": { "AllQueryArguments": {} },
+          "TextTransformations": [{ "Priority": 0, "Type": "NONE" }]
+        }
+      },
+      "Action": { "Block": {} },
+      "VisibilityConfig": {
+        "SampledRequestsEnabled": true,
+        "CloudWatchMetricsEnabled": true,
+        "MetricName": "SQLiRule"
+      }
+    },
+    {
+      "Name": "RateLimitRule",
+      "Priority": 2,
+      "Statement": {
+        "RateBasedStatement": { "Limit": 100, "AggregateKeyType": "IP" }
+      },
+      "Action": { "Block": {} },
+      "VisibilityConfig": {
+        "SampledRequestsEnabled": true,
+        "CloudWatchMetricsEnabled": true,
+        "MetricName": "RateLimitRule"
+      }
+    }
+  ]' \
+  --region us-east-1
+```
+
+---
+
+## Step 3: Normal Traffic Test
+```bash
+curl https://app.example.com
+```
+- Should return your HTML page.
+
+---
+
+## Step 4: SQL Injection Test
+```bash
+curl "https://app.example.com?user=' OR 1=1 --"
+```
+- Should be **blocked by WAF** (HTTP 403).
+
+---
+
+## Step 5: Rate Limit Test
+```bash
+for i in {1..200}; do curl -s https://app.example.com; done
+```
+After ~100 requests/minute from the same IP, WAF should start blocking (HTTP 403).
+
+---
+
+## Step 6: Monitor Logs
+- Go to **CloudWatch → Metrics → WAF**.  
+- You’ll see counters for blocked requests under your WebACL rules.  
+- Use **Sampled Requests** in WAF console to inspect blocked traffic.
+
+---
+
+# End Result
+- **ALB Ingress** routes traffic into EKS.  
+- **ACM** provides HTTPS.  
+- **AWS WAF WebACL** blocks SQL injection and rate‑limited traffic.  
+- You can **verify with curl tests** and **CloudWatch metrics**.  
+
+---
 
 # Full Stack App on EKS with AWS WAF
 
