@@ -2,8 +2,8 @@
 
 ## Step 1: Create EKS Cluster
 ```bash
-eksctl create cluster --name demo-cluster --region us-east-1 --nodes 3
-aws eks update-kubeconfig --region us-east-1 --name demo-cluster
+eksctl create cluster --name my-cluster --region us-east-1 --nodes 1
+aws eks update-kubeconfig --region us-east-1 --name my-cluster
 kubectl get nodes
 ```
 
@@ -12,7 +12,7 @@ kubectl get nodes
 ## Step 2: Push App Image to ECR
 1. Create ECR repo:
 ```bash
-aws ecr create-repository --repository-name eks-html-app --region us-east-1
+aws ecr create-repository --repository-name myhtml-app --region us-east-1
 ```
 
 2. Authenticate Docker to ECR:
@@ -23,9 +23,9 @@ docker login --username AWS --password-stdin <account_id>.dkr.ecr.us-east-1.amaz
 
 3. Build & push:
 ```bash
-docker build -t eks-html-app:latest .
-docker tag eks-html-app:latest <account_id>.dkr.ecr.us-east-1.amazonaws.com/eks-html-app:latest
-docker push <account_id>.dkr.ecr.us-east-1.amazonaws.com/eks-html-app:latest
+docker build -t myhtml-app:latest .
+docker tag myhtml-app:latest <account_id>.dkr.ecr.us-east-1.amazonaws.com/myhtml-app:latest
+docker push <account_id>.dkr.ecr.us-east-1.amazonaws.com/myhtml-app:latest
 ```
 
 ---
@@ -49,7 +49,7 @@ spec:
     spec:
       containers:
         - name: html-container
-          image: <account_id>.dkr.ecr.us-east-1.amazonaws.com/eks-html-app:latest
+          image: <account_id>.dkr.ecr.us-east-1.amazonaws.com/myhtml-app:latest
           ports:
             - containerPort: 80
 EOF
@@ -187,8 +187,8 @@ EOF
 
 Build & push:
 ```bash
-docker build -t <dockerhub_user>/eks-html-app:latest .
-docker push <dockerhub_user>/eks-html-app:latest
+docker build -t <dockerhub_user>/myhtml-app:latest .
+docker push <dockerhub_user>/myhtml-app:latest
 ```
 
 ---
@@ -212,7 +212,7 @@ spec:
     spec:
       containers:
         - name: html-container
-          image: <dockerhub_user>/eks-html-app:latest
+          image: <dockerhub_user>/myhtml-app:latest
           ports:
             - containerPort: 80
 EOF
