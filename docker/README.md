@@ -35,7 +35,7 @@ docker system prune -a
 
 ```
 
-# Docker Crash Course (Extended)
+# Working with Docker
 
 ## Step 1: Create Files
 ```bash
