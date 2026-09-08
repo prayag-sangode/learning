@@ -1,3 +1,153 @@
+# Lab: Deploy App on EKS with ECR, ALB Ingress & ACM
+
+## Step 1: Create EKS Cluster
+```bash
+eksctl create cluster --name demo-cluster --region us-east-1 --nodes 3
+aws eks update-kubeconfig --region us-east-1 --name demo-cluster
+kubectl get nodes
+```
+
+---
+
+## Step 2: Push App Image to ECR
+1. Create ECR repo:
+```bash
+aws ecr create-repository --repository-name eks-html-app --region us-east-1
+```
+
+2. Authenticate Docker to ECR:
+```bash
+aws ecr get-login-password --region us-east-1 | \
+docker login --username AWS --password-stdin <account_id>.dkr.ecr.us-east-1.amazonaws.com
+```
+
+3. Build & push:
+```bash
+docker build -t eks-html-app:latest .
+docker tag eks-html-app:latest <account_id>.dkr.ecr.us-east-1.amazonaws.com/eks-html-app:latest
+docker push <account_id>.dkr.ecr.us-east-1.amazonaws.com/eks-html-app:latest
+```
+
+---
+
+## Step 3: Deployment
+```bash
+cat >> deployment.yaml <<'EOF'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: html-deploy
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: html-app
+  template:
+    metadata:
+      labels:
+        app: html-app
+    spec:
+      containers:
+        - name: html-container
+          image: <account_id>.dkr.ecr.us-east-1.amazonaws.com/eks-html-app:latest
+          ports:
+            - containerPort: 80
+EOF
+kubectl apply -f deployment.yaml
+```
+
+---
+
+## Step 4: Service (ClusterIP)
+```bash
+cat >> service.yaml <<'EOF'
+apiVersion: v1
+kind: Service
+metadata:
+  name: html-service
+spec:
+  type: ClusterIP
+  selector:
+    app: html-app
+  ports:
+    - port: 80
+      targetPort: 80
+EOF
+kubectl apply -f service.yaml
+```
+
+---
+
+## Step 5: Install AWS Load Balancer Controller
+```bash
+helm repo add eks https://aws.github.io/eks-charts
+helm repo update
+helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
+  -n kube-system \
+  --set clusterName=demo-cluster \
+  --set region=us-east-1
+```
+
+---
+
+## Step 6: Request ACM Certificate
+```bash
+aws acm request-certificate \
+  --domain-name app.example.com \
+  --validation-method DNS \
+  --region us-east-1
+```
+- Validate via Route53 DNS.
+
+---
+
+## Step 7: Ingress with ACM
+```bash
+cat >> ingress.yaml <<'EOF'
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: html-ingress
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:123456789012:certificate/abcd-efgh
+spec:
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: html-service
+                port:
+                  number: 80
+EOF
+kubectl apply -f ingress.yaml
+```
+
+---
+
+## Step 8: Test
+```bash
+kubectl get ingress html-ingress
+curl https://app.example.com
+```
+
+- You should see your HTML app served securely via HTTPS.
+
+---
+
+# End Result
+- **ECR** hosts your container image.  
+- **EKS** runs the app with Deployment + Service.  
+- **ALB Ingress Controller** provisions ALB automatically.  
+- **ACM** provides TLS termination for HTTPS.  
+- **App accessible** at `https://app.example.com`.
+
+
 #  Lab: Secure Web App on EKS with ALB + WAF
 
 ## Step 1: Create EKS Cluster
