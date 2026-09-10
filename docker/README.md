@@ -352,6 +352,4 @@ COPY --from=builder /usr/share/nginx/html /usr/share/nginx/html
 - Resource limits.  
 - Dockerfile optimization.  
 
----
 
-This README.md is now a **complete Docker fundamentals lab guide** — perfect for Day‑1 learners and a strong foundation for moving into Kubernetes.
